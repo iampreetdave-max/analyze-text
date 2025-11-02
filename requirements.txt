@@ -1,0 +1,10 @@
+streamlit>=1.28.0
+pandas>=2.0.0
+numpy>=1.24.0
+plotly>=5.17.0
+
+# Optional for PDF generation
+reportlab>=4.0.0
+
+# For better performance
+openpyxl>=3.1.0
