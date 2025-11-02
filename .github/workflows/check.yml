@@ -1,0 +1,425 @@
+# ===================================
+# .github/workflows/keep-alive.yml
+# Keep Streamlit Cloud app active by pinging it every 3 hours
+# ===================================
+
+name: Keep Streamlit App Alive
+
+on:
+  schedule:
+    # Runs every 3 hours (at minutes 0 past every 3rd hour)
+    - cron: '0 */3 * * *'
+  workflow_dispatch: # Allows manual trigger from GitHub Actions tab
+
+jobs:
+  keep-alive:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+      
+      - name: Ping Streamlit App
+        run: |
+          echo "🔄 Pinging Streamlit app to keep it alive..."
+          
+          # Replace with your Streamlit app URL
+          APP_URL="https://your-app-name.streamlit.app"
+          
+          # Ping the app
+          response=$(curl -s -o /dev/null -w "%{http_code}" $APP_URL)
+          
+          if [ $response -eq 200 ]; then
+            echo "✅ App is alive! Response code: $response"
+          else
+            echo "⚠️ App responded with code: $response"
+          fi
+      
+      - name: Log activity
+        run: |
+          echo "Last ping: $(date)" >> keep-alive.log
+          echo "Status: Success" >> keep-alive.log
+          echo "---" >> keep-alive.log
+      
+      - name: Commit log (optional)
+        continue-on-error: true
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add keep-alive.log
+          git diff --quiet && git diff --staged --quiet || git commit -m "🤖 Keep-alive ping: $(date)"
+          git push
+
+---
+
+# ===================================
+# .github/workflows/health-check.yml
+# Comprehensive health check with multiple pings
+# ===================================
+
+name: Health Check
+
+on:
+  schedule:
+    # Every 2 hours during business hours (9 AM - 9 PM UTC)
+    - cron: '0 9-21/2 * * *'
+    # Every 4 hours during off-hours
+    - cron: '0 1,5 * * *'
+  workflow_dispatch:
+
+jobs:
+  health-check:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+      
+      - name: Install dependencies
+        run: |
+          pip install requests
+      
+      - name: Comprehensive Health Check
+        run: |
+          python << 'EOF'
+          import requests
+          import time
+          from datetime import datetime
+          
+          APP_URL = "https://your-app-name.streamlit.app"
+          
+          print(f"🏥 Running health check at {datetime.now()}")
+          print(f"📍 Target URL: {APP_URL}")
+          
+          # Multiple endpoints to check
+          endpoints = [
+              "/",
+              "/_stcore/health"
+          ]
+          
+          all_healthy = True
+          
+          for endpoint in endpoints:
+              url = f"{APP_URL}{endpoint}"
+              try:
+                  start = time.time()
+                  response = requests.get(url, timeout=30)
+                  duration = time.time() - start
+                  
+                  if response.status_code == 200:
+                      print(f"✅ {endpoint}: OK (took {duration:.2f}s)")
+                  else:
+                      print(f"⚠️ {endpoint}: Status {response.status_code}")
+                      all_healthy = False
+              
+              except requests.exceptions.Timeout:
+                  print(f"⏱️ {endpoint}: Timeout (>30s)")
+                  all_healthy = False
+              
+              except Exception as e:
+                  print(f"❌ {endpoint}: Error - {e}")
+                  all_healthy = False
+          
+          if all_healthy:
+              print("\n✅ All health checks passed!")
+          else:
+              print("\n⚠️ Some health checks failed")
+              exit(1)
+          
+          EOF
+      
+      - name: Notify on Failure
+        if: failure()
+        run: |
+          echo "🚨 Health check failed! App may be down."
+          # Add notification logic here (Slack, Discord, Email, etc.)
+
+---
+
+# ===================================
+# .github/workflows/smart-ping.yml
+# Smart pinging with exponential backoff and retry logic
+# ===================================
+
+name: Smart Ping
+
+on:
+  schedule:
+    # Every 2.5 hours
+    - cron: '0 */2 * * *'
+    - cron: '30 */2 * * *'
+  workflow_dispatch:
+
+env:
+  APP_URL: https://your-app-name.streamlit.app
+  MAX_RETRIES: 3
+  RETRY_DELAY: 60
+
+jobs:
+  smart-ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    steps:
+      - name: Smart Health Check with Retries
+        run: |
+          python << 'EOF'
+          import requests
+          import time
+          import sys
+          from datetime import datetime
+          
+          APP_URL = "${{ env.APP_URL }}"
+          MAX_RETRIES = int("${{ env.MAX_RETRIES }}")
+          RETRY_DELAY = int("${{ env.RETRY_DELAY }}")
+          
+          print(f"🔄 Smart ping started at {datetime.now()}")
+          print(f"📍 URL: {APP_URL}")
+          print(f"🔁 Max retries: {MAX_RETRIES}")
+          
+          def ping_with_retry():
+              for attempt in range(1, MAX_RETRIES + 1):
+                  try:
+                      print(f"\n📡 Attempt {attempt}/{MAX_RETRIES}...")
+                      
+                      start_time = time.time()
+                      response = requests.get(
+                          APP_URL,
+                          timeout=30,
+                          headers={'User-Agent': 'GitHub-Actions-KeepAlive/1.0'}
+                      )
+                      duration = time.time() - start_time
+                      
+                      if response.status_code == 200:
+                          print(f"✅ Success! Response time: {duration:.2f}s")
+                          print(f"📊 Content length: {len(response.content)} bytes")
+                          return True
+                      else:
+                          print(f"⚠️ Received status code: {response.status_code}")
+                  
+                  except requests.exceptions.Timeout:
+                      print(f"⏱️ Request timeout (>30s)")
+                  
+                  except requests.exceptions.ConnectionError:
+                      print(f"🔌 Connection error")
+                  
+                  except Exception as e:
+                      print(f"❌ Error: {e}")
+                  
+                  if attempt < MAX_RETRIES:
+                      wait_time = RETRY_DELAY * (2 ** (attempt - 1))  # Exponential backoff
+                      print(f"⏳ Waiting {wait_time}s before retry...")
+                      time.sleep(wait_time)
+              
+              return False
+          
+          success = ping_with_retry()
+          
+          if success:
+              print("\n✅ Ping successful - App is healthy!")
+              sys.exit(0)
+          else:
+              print("\n❌ All retries failed - App may be down!")
+              sys.exit(1)
+          
+          EOF
+      
+      - name: Record metrics
+        if: always()
+        run: |
+          mkdir -p .github/metrics
+          echo "$(date +%s),$(date),${GITHUB_RUN_ID},${{ job.status }}" >> .github/metrics/ping_history.csv
+
+---
+
+# ===================================
+# .github/workflows/deploy.yml
+# Auto-deploy to Streamlit Cloud on push
+# ===================================
+
+name: Deploy to Streamlit Cloud
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-cov flake8
+      
+      - name: Lint with flake8
+        run: |
+          # Stop the build if there are Python syntax errors or undefined names
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+          # Exit-zero treats all errors as warnings
+          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+      
+      - name: Run tests
+        run: |
+          pytest tests/ -v --cov=modules --cov-report=term-missing
+        continue-on-error: true
+      
+      - name: Validate Streamlit app
+        run: |
+          python << 'EOF'
+          import sys
+          try:
+              import streamlit as st
+              from modules.parser import ChatParser
+              from modules.analyzer import ChatAnalyzer
+              from modules.visualizer import Visualizer
+              from modules.report_generator import ReportGenerator
+              print("✅ All modules imported successfully")
+          except Exception as e:
+              print(f"❌ Import error: {e}")
+              sys.exit(1)
+          EOF
+  
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Trigger Streamlit Cloud deployment
+        run: |
+          echo "🚀 Deployment triggered for commit: ${{ github.sha }}"
+          echo "📝 Commit message: ${{ github.event.head_commit.message }}"
+          echo "✅ Streamlit Cloud will auto-deploy from this push"
+      
+      - name: Notify deployment
+        run: |
+          echo "Deployed to: https://your-app-name.streamlit.app"
+
+---
+
+# ===================================
+# .github/workflows/scheduled-tests.yml
+# Run tests periodically to ensure app health
+# ===================================
+
+name: Scheduled Tests
+
+on:
+  schedule:
+    # Run tests daily at 3 AM UTC
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+      
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pytest
+      
+      - name: Run unit tests
+        run: |
+          pytest tests/ -v
+      
+      - name: Integration test
+        run: |
+          python << 'EOF'
+          from modules.parser import ChatParser
+          from modules.analyzer import ChatAnalyzer
+          
+          # Test with sample data
+          sample_chat = """
+          1/15/24, 10:30 AM - John: Hello!
+          1/15/24, 10:31 AM - Jane: Hi there!
+          1/15/24, 10:32 AM - John: How are you?
+          """
+          
+          parser = ChatParser()
+          df = parser.parse(sample_chat)
+          
+          if len(df) == 3:
+              print("✅ Parser test passed")
+          else:
+              print("❌ Parser test failed")
+              exit(1)
+          
+          analyzer = ChatAnalyzer()
+          analysis = analyzer.analyze(df)
+          
+          if analysis['total_messages'] == 3:
+              print("✅ Analyzer test passed")
+          else:
+              print("❌ Analyzer test failed")
+              exit(1)
+          
+          print("✅ All integration tests passed!")
+          EOF
+
+---
+
+# ===================================
+# .github/workflows/wake-up-heroku.yml
+# Alternative: Wake up Heroku app (if deployed there)
+# ===================================
+
+name: Wake Up Heroku App
+
+on:
+  schedule:
+    - cron: '*/25 * * * *'  # Every 25 minutes
+  workflow_dispatch:
+
+jobs:
+  wake:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Ping Heroku app
+        run: |
+          # Replace with your Heroku app URL
+          HEROKU_URL="https://your-app.herokuapp.com"
+          
+          response=$(curl -s -o /dev/null -w "%{http_code}" $HEROKU_URL)
+          
+          if [ $response -eq 200 ]; then
+            echo "✅ Heroku app is awake!"
+          else
+            echo "Status code: $response"
+          fi
