@@ -96,8 +96,8 @@ def main():
                     content = uploaded_file.read().decode('utf-8')
                     parser = ChatParser()
                     messages = parser.parse(content)
-                    
-                    if not messages:
+
+                    if messages.empty:
                         st.error("❌ Could not parse chat. Please check the file format.")
                         return
                     
