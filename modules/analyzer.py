@@ -27,6 +27,11 @@ class ChatAnalyzer:
             "]+", flags=re.UNICODE
         )
 
+        # URL pattern for link detection
+        self.url_pattern = re.compile(
+            r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+'
+        )
+
         # Positive and negative keywords for sentiment analysis
         self.positive_words = {
             'love', 'great', 'good', 'awesome', 'amazing', 'wonderful', 'excellent',
@@ -62,6 +67,7 @@ class ChatAnalyzer:
             'media_count': self._count_media(messages_df),
             'total_words': self._count_total_words(messages_df),
             'deleted_messages': self._count_deleted(messages_df),
+            'link_count': self._count_links(messages_df),
         }
 
         return analysis
@@ -78,6 +84,7 @@ class ChatAnalyzer:
             'media_count': 0,
             'total_words': 0,
             'deleted_messages': 0,
+            'link_count': 0,
         }
 
     def _analyze_users(self, df):
@@ -110,6 +117,9 @@ class ChatAnalyzer:
         # Question count
         question_count = sum(1 for msg in messages if '?' in msg)
 
+        # Link count
+        link_count = sum(1 for msg in messages if self.url_pattern.search(str(msg)))
+
         # Sentiment analysis
         sentiment_score = self._calculate_sentiment(messages)
 
@@ -136,6 +146,7 @@ class ChatAnalyzer:
             'emoji_count': emoji_count,
             'media_count': media_count,
             'question_count': question_count,
+            'link_count': link_count,
             'sentiment_score': sentiment_score,
             'night_owl_score': night_owl_score,
             'morning_score': morning_score,
@@ -236,6 +247,10 @@ class ChatAnalyzer:
         deleted_patterns = ['deleted', 'this message was deleted']
         return sum(1 for msg in df['message']
                   if any(pattern in str(msg).lower() for pattern in deleted_patterns))
+
+    def _count_links(self, df):
+        """Count messages containing links/URLs"""
+        return sum(1 for msg in df['message'] if self.url_pattern.search(str(msg)))
 
     def _calculate_sentiment(self, messages):
         """Calculate sentiment score for messages"""
