@@ -57,8 +57,8 @@ class Visualizer:
             height=400
         )
 
-        fig.update_xaxis(showgrid=True, gridwidth=1, gridcolor='lightgray')
-        fig.update_yaxis(showgrid=True, gridwidth=1, gridcolor='lightgray')
+        fig.update_xaxes(showgrid=True, gridwidth=1, gridcolor='lightgray')
+        fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor='lightgray')
 
         return fig
 
@@ -95,8 +95,8 @@ class Visualizer:
             height=400
         )
 
-        fig.update_xaxis(showgrid=True, gridwidth=1, gridcolor='lightgray')
-        fig.update_yaxis(showgrid=True, gridwidth=1, gridcolor='lightgray')
+        fig.update_xaxes(showgrid=True, gridwidth=1, gridcolor='lightgray')
+        fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor='lightgray')
 
         return fig
 
@@ -133,8 +133,8 @@ class Visualizer:
             height=400
         )
 
-        fig.update_xaxis(showgrid=True, gridwidth=1, gridcolor='lightgray')
-        fig.update_yaxis(showgrid=True, gridwidth=1, gridcolor='lightgray')
+        fig.update_xaxes(showgrid=True, gridwidth=1, gridcolor='lightgray')
+        fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor='lightgray')
 
         return fig
 
@@ -231,8 +231,8 @@ class Visualizer:
         )
 
         fig.add_hline(y=0, line_dash="dash", line_color="gray")
-        fig.update_xaxis(showgrid=True, gridwidth=1, gridcolor='lightgray')
-        fig.update_yaxis(showgrid=True, gridwidth=1, gridcolor='lightgray')
+        fig.update_xaxes(showgrid=True, gridwidth=1, gridcolor='lightgray')
+        fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor='lightgray')
 
         return fig
 
