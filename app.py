@@ -73,6 +73,8 @@ def initialize_session_state():
         st.session_state.analysis = None
     if 'messages_df' not in st.session_state:
         st.session_state.messages_df = None
+    if 'filename' not in st.session_state:
+        st.session_state.filename = "chat.txt"
 
 def main():
     initialize_session_state()
@@ -96,12 +98,13 @@ def main():
                     content = uploaded_file.read().decode('utf-8')
                     parser = ChatParser()
                     messages = parser.parse(content)
-                    
-                    if not messages:
+
+                    if messages.empty:
                         st.error("❌ Could not parse chat. Please check the file format.")
                         return
-                    
+
                     st.session_state.messages_df = messages
+                    st.session_state.filename = uploaded_file.name
                     
                 with st.spinner("Analyzing patterns..."):
                     analyzer = ChatAnalyzer()
@@ -120,7 +123,7 @@ def main():
             # JSON Export
             json_data = report_gen.generate_json(
                 st.session_state.analysis,
-                uploaded_file.name if uploaded_file else "chat.txt"
+                st.session_state.filename
             )
             st.download_button(
                 label="📄 Download JSON",
@@ -145,7 +148,7 @@ def main():
                 with st.spinner("Generating PDF..."):
                     pdf_data = report_gen.generate_pdf(
                         st.session_state.analysis,
-                        uploaded_file.name if uploaded_file else "chat.txt"
+                        st.session_state.filename
                     )
                     st.download_button(
                         label="⬇️ Download PDF",
@@ -156,6 +159,16 @@ def main():
                     )
         
         st.markdown("---")
+
+        # Clear analysis button
+        if st.session_state.analysis is not None:
+            if st.button("🔄 New Analysis", use_container_width=True, type="secondary"):
+                st.session_state.analysis = None
+                st.session_state.messages_df = None
+                st.session_state.filename = "chat.txt"
+                st.rerun()
+
+        st.markdown("---")
         st.markdown("""
         <small>
         **How to Export Chat:**
@@ -164,7 +177,7 @@ def main():
         3. More → Export chat
         4. Choose "Without Media"
         5. Upload .txt file here
-        
+
         🔒 All data processed locally
         </small>
         """, unsafe_allow_html=True)
@@ -217,7 +230,7 @@ def main():
         analysis = st.session_state.analysis
         
         st.markdown(f'<h1 class="main-header">Analysis Complete</h1>', unsafe_allow_html=True)
-        st.markdown(f'<p class="sub-header">{uploaded_file.name if uploaded_file else "Chat Analysis"}</p>', unsafe_allow_html=True)
+        st.markdown(f'<p class="sub-header">{st.session_state.filename}</p>', unsafe_allow_html=True)
         
         # Key metrics
         col1, col2, col3, col4 = st.columns(4)
@@ -308,24 +321,29 @@ def show_users(analysis):
                 st.metric("Messages", f"{stats['message_count']:,}")
             
             # Stats grid
-            col1, col2, col3, col4, col5, col6 = st.columns(6)
-            
+            col1, col2, col3, col4 = st.columns(4)
+
             with col1:
                 st.metric("Words", f"{stats['word_count']:,}")
-            
+
             with col2:
                 st.metric("Avg Length", f"{stats['avg_message_length']:.1f}")
-            
+
             with col3:
                 st.metric("Emojis", f"{stats['emoji_count']:,}")
-            
+
             with col4:
                 st.metric("Media", f"{stats['media_count']:,}")
-            
-            with col5:
+
+            col1, col2, col3 = st.columns(3)
+
+            with col1:
                 st.metric("Questions", f"{stats['question_count']:,}")
-            
-            with col6:
+
+            with col2:
+                st.metric("Links", f"{stats['link_count']:,}")
+
+            with col3:
                 sentiment = stats['sentiment_score']
                 st.metric("Sentiment", f"{'+' if sentiment > 0 else ''}{sentiment}")
             
@@ -438,6 +456,13 @@ def show_champions(analysis):
             'label': 'Media Shared'
         },
         {
+            'icon': '🔗',
+            'title': 'Link Sharer',
+            'user': max(users.items(), key=lambda x: x[1]['link_count']),
+            'metric': 'link_count',
+            'label': 'Links Shared'
+        },
+        {
             'icon': '❓',
             'title': 'Curious Mind',
             'user': max(users.items(), key=lambda x: x[1]['question_count']),
@@ -506,12 +531,15 @@ def show_champions(analysis):
     weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
     peak_day = weekdays[max(enumerate(analysis['weekday_activity']), key=lambda x: x[1])[0]]
     
+    link_count = analysis.get('link_count', 0)
+
     facts = [
         f"📊 Average {total_msgs // total_users:,} messages per person",
         f"⚡ Most active hour: {peak_hour:02d}:00",
         f"📅 Most active day: {peak_day}",
         f"💭 Average message length: {total_words / total_msgs:.1f} words",
         f"🎯 {(media_count / total_msgs * 100):.1f}% of messages contain media",
+        f"🔗 {link_count} links shared across the chat",
         f"🗑️ {(deleted_count / total_msgs * 100):.1f}% of messages were deleted"
     ]
     
